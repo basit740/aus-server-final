@@ -61,7 +61,7 @@ exports.getJob = async (req, res, next) => {
 
 		if (jobRisk.length > 0) {
 			// only then get related data
-			console.log('here', jobRisk);
+
 			const teams = await Team.find({
 				jobRisk: jobRisk[0]._id,
 			});
@@ -75,8 +75,6 @@ exports.getJob = async (req, res, next) => {
 			const newJob = JSON.parse(JSON.stringify(job.toJSON()));
 			const newJobRisk = JSON.parse(JSON.stringify(jobRisk[0].toJSON()));
 
-			console.log('teams', declrations);
-
 			newJobRisk['teams'] = [...teams];
 			newJobRisk['declrations'] = [...declrations];
 
@@ -87,12 +85,16 @@ exports.getJob = async (req, res, next) => {
 
 			res.status(200).json({
 				success: true,
-				job: composedJob,
+				data: {
+					job: composedJob,
+				},
 			});
 		} else {
 			res.status(200).json({
 				success: true,
-				job: job,
+				data: {
+					job: job,
+				},
 			});
 		}
 
@@ -126,8 +128,6 @@ exports.createOrUpdateTaskRisk = async (req, res, next) => {
 		// teams
 		// whats
 
-		console.log('ID', req.params.id);
-		console.log('Payload', req.body);
 		// const job = await Job.create(req.body);
 
 		// find if jobRisk is found with jobId
@@ -136,14 +136,56 @@ exports.createOrUpdateTaskRisk = async (req, res, next) => {
 		});
 
 		if (jobRisk.length !== 0) {
-			console.log('jobRisk found with jobId', jobRisk);
-
 			// udpate all the job risk related data
-
 			// do other steps
+
+			// DELETE MANY  Teams and declarations
+			const teamsDeleted = await Team.deleteMany({
+				jobRisk: jobRisk[0]._id,
+			});
+
+			const decDeleted = await Declaration.deleteMany({
+				jobRisk: jobRisk[0]._id,
+			});
+
+			// Teams
+			const teams = [...req.body.teams];
+
+			teams.map((team) => {
+				team['jobRisk'] = jobRisk[0]._id;
+			});
+			const returnedTeams = await Team.insertMany(teams);
+
+			// Declarations;
+			const declarations = [...req.body.declarations];
+			declarations.map((dec) => {
+				dec['jobRisk'] = jobRisk[0]._id;
+			});
+			const returnedDeclarations = await Declaration.insertMany(declarations);
+
+			// Update jobRisk again
+
+			const resposne = await JobRisk.findByIdAndUpdate(jobRisk[0]._id, {
+				scopeOfWork,
+				permitNumber,
+				timeSigned,
+				location,
+				equipment,
+				approved,
+				whatToDo: req.body.whats[0].whatContent,
+				whatGoWrong: req.body.whats[1].whatContent,
+				howToPrevent: req.body.whats[1].whatContent,
+			});
+			if (response) {
+				res.status(200).json({
+					success: true,
+					flag: 'udpated',
+					data: resposne,
+				});
+			}
 		} else {
 			// create jobRisk
-			console.log('am i here?');
+
 			const jobRiskMinimum = {
 				scopeOfWork,
 				permitNumber,
@@ -172,7 +214,6 @@ exports.createOrUpdateTaskRisk = async (req, res, next) => {
 			declarations.map((dec) => {
 				dec['jobRisk'] = jobRisk._id;
 			});
-
 			const returnedDeclarations = await Declaration.insertMany(declarations);
 
 			if (returnedDeclarations.length > 0) {
